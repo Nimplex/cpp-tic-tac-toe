@@ -1,64 +1,165 @@
 #include <iostream>
-#include <cmath>
-#include <algorithm>
 #include <windows.h>
+#include <time.h>
+#include <vector>
+#include <algorithm>
+#include <iterator>
 
 using namespace std;
 
-string checkWin(int player, int map[9]) {
-	if (
-		(map[0] == player && map[1] == player && map[2] == player) ||
-		(map[3] == player && map[4] == player && map[5] == player) ||
-		(map[6] == player && map[7] == player && map[8] == player) ||
-		(map[0] == player && map[3] == player && map[6] == player) ||
-		(map[1] == player && map[4] == player && map[7] == player) ||
-		(map[2] == player && map[5] == player && map[8] == player) ||
-		(map[0] == player && map[4] == player && map[8] == player) ||
-		(map[2] == player && map[4] == player && map[6] == player)
-	) {
-		return "w";
-	} else {
-		for (int i = 0; i < 9; i++)
-			if (map[i] == 0) return "n";
-		return "r";
-	}
-}
+void renderMap(int*);
+void setCell(int*, int, int);
+void setRandomCell(int*, int);
+int hasAnyoneWon(int*);
+int possibleWinCell(int*);
+int possibleLooseCell(int*);
+vector<int> getAllFreeCells(int*);
+bool isAnyCellFree(int*);
+bool isCellTaken(int*, int);
 
 int main() {
-	int map[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-	int choice = 0;
-	int player = 1;
+	int map[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int choice, player = 1;
 
-	for(;;) {
+	srand(time(NULL));
+
+	for (;;) {
 		system("cls");
 
-		for (int i = 0; i < 9; i++) {
-			int character = map[i];
-			if (i % 3 == 0) cout << endl << " --- --- ---" << endl << "| ";
-			if (character == 0) cout << i + 1;
-			else if (character == 1) cout << "X";
-			else if (character == 2) cout << "O";
-			cout << " | ";
-		}
-		cout << endl << " --- --- --- " << string(2, '\n') << "Player: " << player << endl;
+		// Display map
+		renderMap(map);
 
-		cin >> choice;
-		if (!(choice > 9)) {
-			if (map[choice - 1] == 0) {
+		// Player turn
+		if (player == 1) {
+			cout << "Player turn: ";
+			cin >> choice;
+			if (!(choice > 9) && !isCellTaken(map, choice - 1))
 				map[choice - 1] = player;
-				string hasWon = checkWin(player, map);
-				if (hasWon == "w") {
-					cout << "Player " << player << " won the game!" << endl;
-					return 0;
-				} else if(hasWon == "r") {
-					cout << "Remis!" << endl;
-					return 0;
-				}
-				if (player == 1) player = 2;
-				else player = 1;
-			}
+			player = 2;
 		}
+
+		int playerThatWon = hasAnyoneWon(map);
+		if (playerThatWon != -1) { system("cls"); renderMap(map); }
+		if (playerThatWon == 0) { cout << "Remis"; }
+		else if (playerThatWon == 1) { cout << "Player has won the game!"; }
+		else if (playerThatWon == 2) { cout << "Computer has won the game!"; }
+		if (playerThatWon != -1) { return 0; }
+
+		// Computer turn
+		if (player == 2) {
+			int possibleWin = possibleWinCell(map);
+			int possibleLoose = possibleLooseCell(map);
+			if (possibleWin == -1) {
+				if (possibleLoose == -1) setRandomCell(map, 2);
+				else setCell(map, possibleLoose, 2);
+			} else setCell(map, possibleWin, 2);
+
+			cout << "Computer is thinking...\n";
+			Sleep(200);
+			player = 1;
+		}
+
+		playerThatWon = hasAnyoneWon(map);
+		if (playerThatWon != -1) { system("cls"); renderMap(map); }
+		if (playerThatWon == 0) { cout << "Remis"; }
+		else if (playerThatWon == 1) { cout << "Player has won the game!"; }
+		else if (playerThatWon == 2) { cout << "Computer has won the game!"; }
+		if (playerThatWon != -1) { return 0; }
 	}
 
 	return 0;
+}
+
+void renderMap(int map[9]) {
+	string linia = "\n --- --- --- \n";
+	for (int i = 0; i < 9; i++) {
+		if (i % 3 == 0) cout << linia << "| ";
+		if (map[i] == 0) cout << i + 1;
+		else if (map[i] == 1) cout << "X";
+		else if (map[i] == 2) cout << "O";
+		else cout << "?";
+		cout << " | ";
+	}
+	cout << linia;
+}
+
+void setCell(int map[9], int cell, int player) { map[cell] = player; }
+
+void setRandomCell(int map[9], int player) {
+	int cell = rand() % 8 + 0;
+	if (!isCellTaken(map, cell)) setCell(map, cell, player);
+	else if (isAnyCellFree(map)) {
+		for (int i = 0; i < 9; i++)
+			if (!isCellTaken(map, i)) {
+				setCell(map, i, player);
+				return;
+			}
+	}
+}
+
+vector<int> getAllFreeCells(int map[9]) {
+	vector<int> freeCells;
+	for (int i = 0; i < 9; i++) {
+		if (!isCellTaken(map, i)) {
+			freeCells.push_back(i);
+		}
+	}
+	return freeCells;
+}
+
+bool isAnyCellFree(int map[9]) {
+	for (int i = 0; i < 9; i++) {
+		if (map[i] == 0) return true;
+	}
+	return false;
+}
+
+int hasAnyoneWon(int map[9]) {
+	for (int i = 1; i <= 2; i++) {
+		if (
+			(map[0] == i && map[1] == i && map[2] == i) ||
+			(map[3] == i && map[4] == i && map[5] == i) ||
+			(map[6] == i && map[7] == i && map[8] == i) ||
+			(map[0] == i && map[3] == i && map[6] == i) ||
+			(map[1] == i && map[4] == i && map[7] == i) ||
+			(map[2] == i && map[5] == i && map[8] == i) ||
+			(map[2] == i && map[4] == i && map[6] == i) ||
+			(map[0] == i && map[4] == i && map[8] == i)
+		) {
+			return i;
+		}
+	}
+	if (isAnyCellFree(map)) return -1;
+	return 0;
+}
+
+int possibleWinCell(int map[9]) {
+	vector<int> freeCells = getAllFreeCells(map);
+	cout << int(freeCells.size()) << '\n';
+	for (int i = 0; i < int(freeCells.size()); i++) {
+		int temp[9];
+		copy(map, map + 9, begin(temp));
+		setCell(temp, freeCells[i], 2);
+		if (hasAnyoneWon(temp) == 2) {
+			return freeCells[i];
+		}
+	}
+	return -1;
+}
+
+int possibleLooseCell(int map[9]) {
+	vector<int> freeCells = getAllFreeCells(map);
+	for (int i = 0; i < int(freeCells.size()); i++) {
+		int temp[9];
+		copy(map, map + 9, begin(temp));
+		setCell(temp, freeCells[i], 1);
+		if (hasAnyoneWon(temp) == 1) {
+			return freeCells[i];
+		}
+	}
+	return -1;
+}
+
+bool isCellTaken(int map[9], int cell) {
+	return map[cell] != 0;
 }
